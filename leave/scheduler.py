@@ -3,8 +3,11 @@ from datetime import datetime
 from apscheduler.schedulers.background import BackgroundScheduler
 from django.db import connection
 from django.db.utils import OperationalError
+from django.apps import apps
 
 logger = logging.getLogger(__name__)
+scheduler = None  # To track scheduler instance
+
 
 def leave_reset():
     try:
@@ -15,13 +18,15 @@ def leave_reset():
         logger.error(f"Database not ready: {e}")
         return
 
-    from leave.models import LeaveType
+    # Delay import until DB is ready
+    LeaveType = apps.get_model("leave", "LeaveType")
 
     today = datetime.now().date()
     leave_types = LeaveType.objects.filter(reset=True)
 
     for leave_type in leave_types:
         available_leaves = leave_type.employee_available_leave.all()
+
         for available_leave in available_leaves:
             reset_date = available_leave.reset_date
             expired_date = available_leave.expired_date
@@ -45,7 +50,9 @@ def leave_reset():
             leave_type.carryforward_expire_date = leave_type.set_expired_date(today)
             leave_type.save()
 
+
 def start():
+    global scheduler
     try:
         if "leave_leavetype" not in connection.introspection.table_names():
             logger.warning("leave_leavetype table not found. Skipping scheduler.")
@@ -54,7 +61,10 @@ def start():
         logger.error(f"Error checking DB readiness: {e}")
         return
 
-    global scheduler
+    if scheduler and scheduler.running:
+        logger.info("Leave scheduler already running.")
+        return
+
     scheduler = BackgroundScheduler()
     scheduler.add_job(leave_reset, "interval", seconds=20)
     scheduler.start()
