@@ -21,6 +21,7 @@ from notifications import settings as notifications_settings
 from notifications.signals import notify
 from notifications.utils import id2slug
 
+
 if StrictVersion(get_version()) >= StrictVersion("1.8.0"):
     from django.contrib.contenttypes.fields import GenericForeignKey  # noqa
 else:
@@ -225,10 +226,10 @@ class AbstractNotification(models.Model):
     class Meta:
         abstract = True
         ordering = ("-timestamp",)
-        # speed up notifications count query
         indexes = [
-            Index(fields=['user', 'unread']),
+            Index(fields=['recipient', 'unread']), 
         ]
+
 
     def __str__(self):
         ctx = {
