@@ -121,18 +121,12 @@ if env("DATABASE_URL", default=None):
 else:
     DATABASES = {
         "default": {
-            "ENGINE": env("DB_ENGINE", default="django.db.backends.sqlite3"),
-            "NAME": env(
-                "DB_NAME",
-                default=os.path.join(
-                    BASE_DIR,
-                    "TestDB_Horilla.sqlite3",
-                ),
-            ),
-            "USER": env("DB_USER", default=""),
-            "PASSWORD": env("DB_PASSWORD", default=""),
-            "HOST": env("DB_HOST", default=""),
-            "PORT": env("DB_PORT", default=""),
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": env("DB_NAME", default="horilla_db_vkhf"),
+            "USER": env("DB_USER", default="horilla_db_vkhf_user"),
+            "PASSWORD": env("DB_PASSWORD", default="sg0gB8HFCePsIHcIGhmEfTfdx0yZ5Mlc"),
+            "HOST": env("DB_HOST", default="dpg-d26a9dvdiees738soing-a"),
+            "PORT": env("DB_PORT", default="5432"),
         }
     }
 
