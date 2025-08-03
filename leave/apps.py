@@ -1,5 +1,6 @@
-from django.apps import AppConfig, apps
+from django.apps import AppConfig
 import sys
+import threading
 
 
 class LeaveConfig(AppConfig):
@@ -7,21 +8,21 @@ class LeaveConfig(AppConfig):
     name = "leave"
 
     def ready(self):
-        from django.urls import include, path
-        from horilla.horilla_settings import APPS
-        from horilla.urls import urlpatterns
-        from leave import signals
+        from leave import signals  # Your signal registration
 
-        APPS.append("leave")
-        urlpatterns.append(
-            path("leave/", include("leave.urls")),
-        )
+        # Avoid starting scheduler during manage.py commands like migrate, etc.
+        if any(cmd in sys.argv for cmd in [
+            'makemigrations', 'migrate', 'collectstatic', 'shell',
+            'loaddata', 'createsuperuser', 'test'
+        ]):
+            return
 
-        if not any(cmd in sys.argv for cmd in ['makemigrations', 'migrate', 'collectstatic', 'shell', 'loaddata', 'createsuperuser']):
+        def start_scheduler():
             try:
-                from leave.scheduler import start  # ✅ Correct import
-                start()  # ✅ Correct call to start scheduler
+                from leave.scheduler import start
+                start()
             except Exception as e:
-                print("Error starting leave scheduler:", str(e))
+                print("[Leave Scheduler Error]", str(e))
 
-        super().ready()
+        # Run scheduler in a separate thread to avoid blocking app startup
+        threading.Thread(target=start_scheduler).start()
