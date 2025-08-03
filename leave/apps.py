@@ -1,31 +1,33 @@
-from django.apps import AppConfig, apps
-import sys  # needed to check command-line arguments
-
+from django.apps import AppConfig
+import sys
 
 class LeaveConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
     name = "leave"
 
     def ready(self):
-        from django.urls import include, path
-        from horilla.horilla_settings import APPS
-        from horilla.urls import urlpatterns
-        from leave import signals
+        try:
+            from django.urls import include, path
+            from horilla.horilla_settings import APPS
+            from horilla.urls import urlpatterns
 
-        # Register leave app's URL and signals
-        APPS.append("leave")
-        urlpatterns.append(
-            path("leave/", include("leave.urls")),
-        )
+            # Register app
+            APPS.append("leave")
+            urlpatterns.append(path("leave/", include("leave.urls")))
 
-        # Only run the scheduler if not running a migration or other management command
-        if not any(cmd in sys.argv for cmd in ['makemigrations', 'migrate', 'collectstatic', 'shell', 'loaddata', 'createsuperuser']):
+            # Load signals
+            import leave.signals
+        except Exception as e:
+            print("[LeaveConfig] Error during setup:", e)
+
+        # Avoid running scheduler during migration-related commands
+        if not any(cmd in sys.argv for cmd in [
+            'makemigrations', 'migrate', 'collectstatic', 'shell',
+            'loaddata', 'createsuperuser', 'test'
+        ]):
             try:
-                from leave.scheduler import leave_reset, scheduler
+                from leave.scheduler import scheduler
                 if not scheduler.running:
                     scheduler.start()
             except Exception as e:
-                # Log or print the exception for debugging (you can remove later)
-                print("Error starting leave scheduler:", str(e))
-
-        super().ready()
+                print("[LeaveConfig] Scheduler error:", str(e))
