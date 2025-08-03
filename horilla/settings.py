@@ -16,31 +16,34 @@ from pathlib import Path
 
 import environ
 import dj_database_url
+import environ
 from django.contrib.messages import constants as messages
 
-env = environ.Env()
-environ.Env.read_env()
-
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
-BASE_DIR = Path(__file__).resolve().parent.parent
-
-# Environment Configuration
+# Load environment variables
 env = environ.Env(
     DEBUG=(bool, False),
-    SECRET_KEY=(str, "django-insecure-placeholder-key"),
+    SECRET_KEY=(str, ""),
     ALLOWED_HOSTS=(list, ["127.0.0.1", "localhost"]),
-    CSRF_TRUSTED_ORIGINS=(list, ["http://localhost:8000"]),
+    CSRF_TRUSTED_ORIGINS=(list, [])
 )
+env.read_env(Path(__file__).resolve().parent.parent / ".env")
 
-env.read_env(os.path.join(BASE_DIR, ".env"), overwrite=True)
+BASE_DIR = Path(__file__).resolve().parent.parent
 
-# SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = env("SECRET_KEY")
-
-# SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env("DEBUG")
-
 ALLOWED_HOSTS = env("ALLOWED_HOSTS")
+CSRF_TRUSTED_ORIGINS = env("CSRF_TRUSTED_ORIGINS")
+
+# env.read_env(os.path.join(BASE_DIR, ".env"), overwrite=True)
+
+# # SECURITY WARNING: keep the secret key used in production secret!
+# SECRET_KEY = env("SECRET_KEY")
+
+# # SECURITY WARNING: don't run with debug turned on in production!
+# DEBUG = env("DEBUG")
+
+# ALLOWED_HOSTS = env("ALLOWED_HOSTS")
 
 # Application definition
 INSTALLED_APPS = [
