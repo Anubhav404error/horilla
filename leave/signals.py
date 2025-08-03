@@ -1,100 +1,101 @@
-# leave/signals.py
-
 import threading
 
 from django.apps import apps
-from django.db.models.signals import post_migrate, post_save, pre_delete, pre_save
+from django.db.models.signals import pre_delete, pre_save
 from django.dispatch import receiver
 from django.utils.translation import gettext_lazy as _
 
 from horilla.methods import get_horilla_model_class
 from leave.models import LeaveRequest
 
-if apps.is_installed("attendance"):
 
-    @receiver(pre_save, sender=LeaveRequest)
-    def leaverequest_pre_save(sender, instance, **_kwargs):
-        """
-        Overriding LeaveRequest model save method
-        """
-        WorkRecords = get_horilla_model_class(
-            app_label="attendance", model="workrecords"
-        )
-        if (
-            instance.start_date == instance.end_date
-            and instance.end_date_breakdown != instance.start_date_breakdown
-        ):
-            instance.end_date_breakdown = instance.start_date_breakdown
-            super(LeaveRequest, instance).save()
+@receiver(pre_save, sender=LeaveRequest)
+def leaverequest_pre_save(sender, instance, **_kwargs):
+    """
+    Overriding LeaveRequest model save method
+    """
+    if not apps.is_installed("attendance"):
+        return
 
-        period_dates = instance.requested_dates()
-        if instance.status == "approved":
-            for date in period_dates:
-                try:
-                    work_entry = (
-                        WorkRecords.objects.filter(
-                            date=date,
-                            employee_id=instance.employee_id,
-                        ).first()
-                        if WorkRecords.objects.filter(
-                            date=date,
-                            employee_id=instance.employee_id,
-                        ).exists()
-                        else WorkRecords()
-                    )
-                    work_entry.employee_id = instance.employee_id
-                    work_entry.is_leave_record = True
-                    work_entry.leave_request_id = instance
-                    work_entry.day_percentage = (
-                        0.50
-                        if instance.start_date == date
-                        and instance.start_date_breakdown == "first_half"
-                        or instance.end_date == date
-                        and instance.end_date_breakdown == "second_half"
-                        else 0.00
-                    )
-                    status = (
-                        "CONF"
-                        if instance.start_date == date
-                        and instance.start_date_breakdown == "first_half"
-                        or instance.end_date == date
-                        and instance.end_date_breakdown == "second_half"
-                        else "ABS"
-                    )
-                    work_entry.work_record_type = status
-                    work_entry.date = date
-                    work_entry.message = (
-                        "Leave"
-                        if status == "ABS"
-                        else _("Half day Attendance need to validate")
-                    )
-                    work_entry.save()
+    WorkRecords = get_horilla_model_class(
+        app_label="attendance", model="workrecords"
+    )
 
-                except Exception as e:
-                    print(e)
+    if (
+        instance.start_date == instance.end_date
+        and instance.end_date_breakdown != instance.start_date_breakdown
+    ):
+        instance.end_date_breakdown = instance.start_date_breakdown
+        super(LeaveRequest, instance).save()
 
-        else:
-            for date in period_dates:
-                WorkRecords.objects.filter(
-                    is_leave_record=True,
-                    date=date,
-                    employee_id=instance.employee_id,
-                ).delete()
+    period_dates = instance.requested_dates()
+    if instance.status == "approved":
+        for date in period_dates:
+            try:
+                work_entry = (
+                    WorkRecords.objects.filter(
+                        date=date,
+                        employee_id=instance.employee_id,
+                    ).first()
+                    or WorkRecords()
+                )
+                work_entry.employee_id = instance.employee_id
+                work_entry.is_leave_record = True
+                work_entry.leave_request_id = instance
+                work_entry.day_percentage = (
+                    0.50
+                    if instance.start_date == date
+                    and instance.start_date_breakdown == "first_half"
+                    or instance.end_date == date
+                    and instance.end_date_breakdown == "second_half"
+                    else 0.00
+                )
+                status = (
+                    "CONF"
+                    if instance.start_date == date
+                    and instance.start_date_breakdown == "first_half"
+                    or instance.end_date == date
+                    and instance.end_date_breakdown == "second_half"
+                    else "ABS"
+                )
+                work_entry.work_record_type = status
+                work_entry.date = date
+                work_entry.message = (
+                    "Leave"
+                    if status == "ABS"
+                    else _("Half day Attendance need to validate")
+                )
+                work_entry.save()
 
-    @receiver(pre_delete, sender=LeaveRequest)
-    def leaverequest_pre_delete(sender, instance, **kwargs):
+            except Exception as e:
+                print(f"Error while saving WorkRecord for {date}: {e}")
+
+    else:
+        WorkRecords.objects.filter(
+            is_leave_record=True,
+            date__in=period_dates,
+            employee_id=instance.employee_id,
+        ).delete()
+
+
+@receiver(pre_delete, sender=LeaveRequest)
+def leaverequest_pre_delete(sender, instance, **kwargs):
+    if not apps.is_installed("attendance"):
+        return
+    try:
         from attendance.models import WorkRecords
+        WorkRecords.objects.filter(leave_request_id=instance).delete()
+    except Exception as e:
+        print(f"Error during leave deletion cleanup: {e}")
 
-        work_records = WorkRecords.objects.filter(leave_request_id=instance).delete()
 
-
-# @receiver(post_migrate)
 def add_missing_leave_to_workrecords(sender, **kwargs):
     if sender.label not in ["attendance", "leave"]:
         return
 
     if not apps.is_installed("attendance"):
         return
+
     try:
         from attendance.models import WorkRecords
         from leave.models import LeaveRequest
