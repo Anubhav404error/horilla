@@ -15,6 +15,7 @@ from os.path import join
 from pathlib import Path
 
 import environ
+import dj_database_url
 from django.contrib.messages import constants as messages
 
 env = environ.Env()
