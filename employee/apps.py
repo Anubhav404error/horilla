@@ -3,22 +3,16 @@ import sys
 
 
 class EmployeeConfig(AppConfig):
-    """
-    AppConfig for the 'employee' app.
-    """
-
     default_auto_field = "django.db.models.BigAutoField"
     name = "employee"
 
     def ready(self):
-        # Import signals if any (optional)
         from employee import signals
 
-        # Only start scheduler if not running management commands
-        if not any(cmd in sys.argv for cmd in ['makemigrations', 'migrate', 'collectstatic', 'shell', 'loaddata', 'createsuperuser']):
+        # Only run the scheduler when NOT in a management command
+        if 'runserver' in sys.argv or 'gunicorn' in sys.argv:
             try:
-                from employee.scheduler import run_disciplinary_scheduler, scheduler  # or whatever your function is called
-                if not scheduler.running:
-                    scheduler.start()
+                from employee.scheduler import start_employee_scheduler
+                start_employee_scheduler()
             except Exception as e:
-                print("Error starting employee scheduler:", str(e))
+                print("[Scheduler Error] Failed to start scheduler:", str(e))
