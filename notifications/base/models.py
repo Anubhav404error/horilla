@@ -15,6 +15,7 @@ from django.db.models.query import QuerySet
 from django.utils import timezone
 from model_utils import Choices
 from swapper import load_model
+from django.db.models import Index
 
 from notifications import settings as notifications_settings
 from notifications.signals import notify
@@ -225,7 +226,9 @@ class AbstractNotification(models.Model):
         abstract = True
         ordering = ("-timestamp",)
         # speed up notifications count query
-        index_together = ("recipient", "unread")
+        indexes = [
+            Index(fields=['user', 'unread']),
+        ]
 
     def __str__(self):
         ctx = {
